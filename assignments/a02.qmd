@@ -1,0 +1,49 @@
+---
+title: "Tidy Data from My Research assignment"
+author: Huong Trinh
+format:
+  html:
+    toc: true
+    toc-depth: 3
+execute:
+  warning: false
+  message: false
+---
+
+# Introduction
+
+## About the data
+
+To estimate the midpoint potential (E°′) of the SOI heme, I carried out a UV–Vis redox titration using a mediator (free FAD) and sodium dithionite as the reductant under anaerobic conditions. The dataset contained a baseline spectrum and a series of UV–visible spectra collected after sequential dithionite additions (labeled as FAD&Dithionite-0, -2, -4, -6, -7, -8, -9, -10, and -11). At each titration point, the sample was allowed to reach redox equilibrium between the heme in SOI and the FAD mediator, and then the absorbance spectrum (200–800 nm) was recorded. Changes in spectral features—especially in the heme region (including the Soret band around \~400–430 nm)—were used to track the ferric-to-ferrous conversion as the solution became more reducing. By comparing spectra across titration points (and using baseline/difference processing), the spectral response was converted into a redox fraction versus potential relationship, which was then used to determine the apparent midpoint potential.
+
+## Setup
+
+Best practice: put all `library()` calls in one chunk near the top so collaborators can see what packages are required.
+
+```{r}
+library(here)
+library(readr)
+```
+
+# Read in the data
+
+Quarto runs R in the same way as a script: objects only exist after the chunks that create them have been run.
+
+Using `here()` is a convenient way to build paths relative to your project root (e.g., your `.qmd` might live in `scripts/` while data lives in `data/`).
+
+```{r}
+Uv_vis_data <- read_csv(here::here("raw_data", "SOIandDithinonite.csv"))
+```
+
+Quick peek at the data:
+
+```{r}
+
+names(Uv_vis_data)
+head(Uv_vis_data)
+summary(Uv_vis_data)
+```
+
+# Comment on my research data
+
+The raw data table was not in tidy format because it was arranged as multiple side-by-side mini-tables: the wavelength column was repeated for each titration block, absorbance values were spread across many columns (wide format), and the titration condition (the dithionite addition step) was embedded in the column headers instead of being recorded as its own column.
