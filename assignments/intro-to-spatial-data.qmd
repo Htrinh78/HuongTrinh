@@ -7,11 +7,18 @@ toc: true
 toc-depth: 2
 number-sections: false
 theme: cosmo
+execute:
+  echo: false
+  message: false
+  warning: false
 ---
 
 ## Set up
 
 ```{r}
+#| message: false
+#| warning: false
+
 # Load libraries
 library(readr)
 library(here)
@@ -21,6 +28,15 @@ library(leaflet)
 library(scales)
 library(ggspatial)
 library(dplyr)
+```
+
+```{r}
+#| include: false
+
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE
+)
 ```
 
 ## Exploring the data using `plot()` and `st_crs()`
@@ -125,7 +141,8 @@ The code below shows why CRS is important. This code is not run because the two 
 
 ```{r}
 #| eval: false
-
+#| include: false
+#| 
 pop_joined_sf <- st_join(pop_4326_sf,
                          ak_rgns_3338_sf,
                          join = st_within)
@@ -219,7 +236,7 @@ plot(pop_mgmt_3338_sf["total_pop"])
 This code can save the new spatial object as a shapefile. I kept it commented out because I do not need to create a new file every time I render the document.
 
 ```{r}
-#| results: hide
+#| include: false
 
 write_sf(pop_rgn_3338_sf, here("training_Htrinh", "data", "ak_regions_population.shp"))
 ```
@@ -229,7 +246,9 @@ write_sf(pop_rgn_3338_sf, here("training_Htrinh", "data", "ak_regions_population
 This code makes a simple population map. I hid this map in the HTML because I only want to show the final map later.
 
 ```{r}
-#| fig-show: hide
+#| echo: false
+#| fig-width: 8
+#| fig-height: 4.5
 
 ggplot(pop_rgn_3338_sf) +
     geom_sf(aes(fill = total_pop)) +
@@ -243,12 +262,16 @@ ggplot(pop_rgn_3338_sf) +
 For the final static map, I added the Alaska regions, city points, and rivers together.
 
 ```{r}
+#| results: hide
 rivers_3338_sf <- read_sf(here("training_Htrinh", "data/ak_rivers_simp.shp"))
 
 st_crs(rivers_3338_sf)
 ```
 
 ```{r}
+#| echo: false
+#| fig-width: 8
+#| fig-height: 4.5
 ggplot() +
     geom_sf(data = pop_rgn_3338_sf,
             aes(fill = total_pop)) +
@@ -268,10 +291,11 @@ ggplot() +
 
 ## Optional basemap with `ggspatial`
 
-This part is optional. I kept the code here, but I did not run it because online map tiles can take more time and this part is not required.
+I kept the code here, but I did not run it because online map tiles can take more time and this part is not required.
 
 ```{r}
 #| eval: false
+#| include: false
 
 pop_3857_sf <- st_transform(pop_3338_sf,
                             crs = 3857)
@@ -311,7 +335,8 @@ This first leaflet map is a simple version. I kept it as code only so the HTML d
 
 ```{r}
 #| eval: false
-
+#| include: false
+#| 
 m <- leaflet(options = leafletOptions(crs = epsg3338)) %>%
     addPolygons(data = pop_rgn_4326_sf,
                 fillColor = "gray",
@@ -324,7 +349,8 @@ This second leaflet map adds color, labels, and a legend. I also kept it as code
 
 ```{r}
 #| eval: false
-
+#| include: false
+#| 
 pal <- colorNumeric(palette = "Reds", domain = pop_rgn_4326_sf$total_pop)
 
 m <- leaflet(options = leafletOptions(crs = epsg3338)) %>%
@@ -342,13 +368,16 @@ m <- leaflet(options = leafletOptions(crs = epsg3338)) %>%
         values = range(pop_rgn_4326_sf$total_pop),
         title = "Total Population"
     )
-
 m
 ```
 
 The final interactive map shows the Alaska regions and the city points. The city labels show the city name and population.
 
 ```{r}
+#| echo: false
+#| out-height: "550px"
+#| out-width: "100%"
+#| #| 
 pal <- colorNumeric(palette = "Reds", domain = pop_rgn_4326_sf$total_pop)
 
 m <- leaflet(options = leafletOptions(crs = epsg3338)) %>%
