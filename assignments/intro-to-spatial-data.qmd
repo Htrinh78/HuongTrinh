@@ -7,17 +7,11 @@ toc: true
 toc-depth: 2
 number-sections: false
 theme: cosmo
-execute:
-  echo: false
-  message: false
-  warning: false
 ---
 
 ## Set up
 
 ```{r}
-#| message: false
-#| warning: false
 
 # Load libraries
 library(readr)
@@ -30,14 +24,6 @@ library(ggspatial)
 library(dplyr)
 ```
 
-```{r}
-#| include: false
-
-knitr::opts_chunk$set(
-  message = FALSE,
-  warning = FALSE
-)
-```
 
 ## Exploring the data using `plot()` and `st_crs()`
 
@@ -74,6 +60,7 @@ Spatial data need a coordinate reference system, also called CRS. The CRS tells 
 #| results: hide
 
 st_crs(ak_rgns_sf)
+
 ```
 
 The first map looked a little strange because the data were in longitude and latitude. I changed the Alaska region data to EPSG 3338 because this CRS is better for mapping Alaska.
