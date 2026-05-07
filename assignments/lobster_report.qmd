@@ -1,0 +1,380 @@
+---
+title: "Lobster Report"
+format: html
+author: Tymesha Bovell and Huong Trinh
+date: today
+toc: false
+toc-depth: 2
+number-sections: false
+theme: cosmo
+execute:
+  message: false
+  warning: false
+  echo: false
+---
+
+## Data source
+
+The lobster abundance and size data used in this report were obtained from the **Santa Barbara Coastal Long-Term Ecological Research (SBC LTER)** program, archived on the EDI Data Portal. Data were collected by divers conducting annual and periodic surveys along permanent transects at five reef sites in the Santa Barbara Channel. Lobster counts and carapace lengths (mm) were recorded at each transect and replicate.
+
+**-Dataset:** Reed, D., and R. Miller. 2023. \*SBC LTER: Reef: Abundance, size and fishing effort for California Spiny Lobster (Panulirus interruptus), ongoing since 2012.
+
+\-**Downloaded:** April 17, 2026
+
+\- **Direct download link:** <https://portal.edirepository.org/nis/mapbrowse?packageid=knb-lter-sbc.77.8>
+
+## Abstract
+
+This report examines the relationship between commercial fishing pressure and California spiny lobster (\*Panulirus interruptus\*) population health along the Santa Barbara Channel coast, using long-term monitoring data collected by SBC LTER researchers from 2012 to 2025. The owner analysis focuses on lobster abundance and size distribution across five reef sites, while the collaborator analysis examines commercial trap buoy counts as a measure of fishing pressure. Together, the analyses explore whether higher commercial trapping activity corresponds to lower lobster abundance and smaller body sizes, providing evidence for the negative impact of commercial fishing on local lobster populations.
+
+------------------------------------------------------------------------
+
+## Introduction
+
+Understanding how fishing pressure influences marine populations is essential for sustainable fisheries management. The California spiny lobster (Panulirus interruptus) is both an ecologically important predator in southern California kelp forest ecosystems and a valuable commercial species. Variation in lobster abundance and size structure across sites may reflect the combined effects of fishing activity, site-specific environmental conditions, and management practices.
+
+In addition to fishing pressure, marine protected area (MPA) status provides important context for interpretation. According to the SBC LTER lobster fishing pressure protocol (Harrer and Nelson, 2014), the sites Naples and Isla Vista were designated as marine protected areas (MPAs) in 2012. Within this dataset, the site NAPL corresponds to Naples and is therefore treated as a confirmed MPA site. However, MPA status is not explicitly defined for all site codes, and not all sites can be directly matched to protected areas. As a result, comparisons between protected and non-protected sites are limited and must be interpreted cautiously.
+
+The central focus of this study is to assess whether a consistent negative relationship exists between fishing pressure and lobster population characteristics, or whether this relationship varies across sites. Specifically, this analysis tests whether sites with higher trap density and more frequent high-pressure classifications show lower lobster abundance or a reduced proportion of large individuals during the 2019–2021 period. By comparing biological patterns with fishing effort across sites and incorporating confirmed MPA status where available, this study aims to identify whether reduced fishing pressure is associated with stronger lobster populations.
+
+------------------------------------------------------------------------
+
+## Data Analysis
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+# Load libraries
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(patchwork)
+library(here)
+```
+
+```{r}
+# Read in the data
+lobster_abundance <- read_csv(here::here("data/Lobster_Abundance_All_Years_20260108.csv"))
+lobster_traps <- read_csv(here::here("data/Lobster_Trap_Counts_All_Years_20210519.csv"))
+```
+
+### Lobster Abundance and Size (All Years)
+
+#### **Data Exploration and Cleaning**
+
+The lobster abundance and size dataset contains 14,333 rows and 10 columns, spanning observations from 2012 through 2025 across five reef sites: Arroyo Quemado (AQUE), Carpinteria (CARP), Isla Vista (IVEE), Mohawk (MOHK), and Naples (NAPL). Variables include the year, month, date, site, transect, replicate, carapace length (\`SIZE_MM\`), lobster count, and survey area.
+
+During initial exploration, the \`SIZE_MM\` column was found to use \`-99999\` as a placeholder for missing carapace measurements. These values were recoded as \`NA\` prior to analysis to prevent them from distorting any size-based summaries or visualizations. After cleaning, 154 distinct carapace lengths were recorded, ranging from 18 mm to 220 mm.
+
+#### **Data Wrangling**
+
+To support targeted analysis, two subsets were created from the cleaned dataset. The first excluded observations from Naples Reef (NAPL) to allow comparison among the four remaining non-MPA and MPA sites independently. The second isolated individuals from Arroyo Quemado (AQUE) with a carapace length of at least 70 mm, capturing the larger size class at that site. In addition, maximum carapace length was computed for each combination of site and sampling month, providing a summary of the largest individuals recorded across the monitoring period. For the size class visualization, lobsters surveyed between 2019 and 2021 were classified as either "small" (carapace ≤ 70 mm) or "large" (carapace \> 70 mm), and counts within each size class were summarized by site.
+
+```{r}
+lobster_abundance <- lobster_abundance %>%
+  mutate(SIZE_MM = na_if(SIZE_MM, -99999))
+
+not_napl <- lobster_abundance %>%
+  filter(SITE != "NAPL")
+
+aque_70mm <- lobster_abundance %>%
+  filter(SITE == "AQUE" & SIZE_MM >= 70)
+
+max_lobster <- lobster_abundance %>%
+  group_by(SITE, MONTH) %>%
+  summarize(MAX_LENGTH = max(SIZE_MM, na.rm = TRUE), .groups = "drop")
+
+lobsters_summarize <- lobster_abundance %>%
+  group_by(SITE, YEAR) %>%
+  summarize(COUNT = n(), .groups = "drop")
+
+lobster_size_lrg <- lobster_abundance %>%
+  filter(YEAR %in% c(2019, 2020, 2021)) %>%
+  mutate(SIZE_BIN = if_else(SIZE_MM <= 70, true = "small", false = "large")) %>%
+  group_by(SITE, SIZE_BIN) %>%
+  summarize(COUNT = n(), .groups = "drop") %>%
+  drop_na()
+```
+
+### Lobster Trap Buoy Counts (All Years)
+
+#### **Data Exploration and Cleaning**
+
+The lobster trap buoy counts dataset contains trap count observations collected across the same five reef sites from 2012 to 2021. Variables include the year, month, date, site, transect, replicate, and the number of commercial trap floats (TRAPS). During initial exploration, the TRAPS column was found to use -99999 as a placeholder for missing values. These were recoded as NA before any analysis to avoid skewing the results.
+
+#### **Data Wrangling**
+
+To support interpretation of fishing pressure, trap counts were summarized by site and year to examine temporal changes across locations. In addition, observations from 2019 to 2021 were classified into "high" and "low" fishing pressure categories using a threshold of 8 traps, following the class exercise. These categories were then summarized by site to compare how frequently higher fishing pressure occurred across the study area.
+
+```{r}
+lobster_traps <- lobster_traps %>% 
+    mutate(TRAPS = na_if(TRAPS, -99999)) %>%
+    filter(SITE %in% c("AQUE", "CARP", "IVEE", "MOHK", "NAPL"))
+
+not_napl <- lobster_traps %>% 
+    filter(SITE != "NAPL")
+
+carp_20_traps <- lobster_traps %>% 
+    filter(SITE == "CARP" & TRAPS > 20)
+
+max_lobster_traps <- lobster_traps %>% 
+    group_by(SITE, MONTH) %>%
+    summarize(MAX_TRAPS = max(TRAPS, na.rm = TRUE))
+
+lobster_traps_summarize <- lobster_traps %>%
+  group_by(SITE, YEAR) %>%
+  summarise(TOTAL_TRAPS = sum(TRAPS, na.rm = TRUE), .groups = "drop")
+
+lobster_traps_fishing_pressure <- lobster_traps %>% 
+    filter(YEAR %in% c(2019, 2020, 2021)) %>%
+    mutate(FISHING_PRESSURE = if_else(TRAPS >= 8, true = "high", false = "low")) %>%
+    group_by(SITE, FISHING_PRESSURE) %>%
+    summarize(COUNT = n()) %>%
+    drop_na()
+```
+
+------------------------------------------------------------------------
+
+## Data Visualization
+
+### Lobster Abundance and Size (All Years)
+
+```{r}
+# Figure 1 — Size distribution histogram
+fig1_size_hist <- ggplot(data = lobster_abundance, aes(x = SIZE_MM)) +
+  geom_histogram(binwidth = 5, fill = "#2a6b8a", color = "white", alpha = 0.85) +
+  facet_wrap(~ SITE, ncol = 2) +
+  scale_x_continuous(limits = c(30, 180), breaks = seq(0, 180, by = 50)) +
+  labs(
+    title = "Lobster Carapace Size Distribution by Site",
+    x = "Carapace Length (mm)",
+    y = "Count"
+  ) +
+  theme_light() +
+  theme(
+    plot.title       = element_text(size = 13, face = "bold", hjust = 0.5),
+    axis.title       = element_text(size = 11, face = "bold"),
+    axis.text        = element_text(size = 9),
+    strip.text       = element_text(size = 10, face = "bold"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+# Figure 2 — Lobster abundance over time
+fig2_abundance <- ggplot(data = lobsters_summarize,
+                         aes(x = YEAR, y = COUNT, color = SITE)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = seq(2012, 2025, 2)) +
+  labs(
+    title = "Total Lobsters Observed by Year",
+    x = "Year",
+    y = "Number of Lobsters",
+    color = "Site"
+  ) +
+  theme_light() +
+  theme(
+    plot.title       = element_text(size = 13, face = "bold", hjust = 0.5),
+    axis.title       = element_text(size = 11, face = "bold"),
+    axis.text.x      = element_text(size = 9, angle = 45, vjust = 0.5),
+    axis.text.y      = element_text(size = 9),
+    legend.title     = element_text(size = 10),
+    legend.text      = element_text(size = 9),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+# Figure 3 — Size class bar chart (2019–2021)
+fig3_size_class <- ggplot(data = lobster_size_lrg,
+                          aes(x = SITE, y = COUNT, fill = SIZE_BIN)) +
+  geom_col(position = "dodge", alpha = 0.9) +
+  scale_fill_manual(values = c("large" = "#e07b54", "small" = "#4db3a4"),
+                    labels = c("Large (> 70 mm)", "Small (≤ 70 mm)")) +
+  labs(
+    title = "Lobster Size Class by Site (2019–2021)",
+    x = "Site",
+    y = "Count",
+    fill = "Size Class"
+  ) +
+  theme_light() +
+  theme(
+    plot.title       = element_text(size = 13, face = "bold", hjust = 0.5),
+    axis.title       = element_text(size = 11, face = "bold"),
+    axis.text        = element_text(size = 9),
+    legend.title     = element_text(size = 10),
+    legend.text      = element_text(size = 9),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+```
+
+**Figure 1: Size Distribution Patterns**
+
+```{r}
+#| label: fig-size-hist
+#| fig-cap: "Distribution of California spiny lobster carapace length (mm) at each of the five SBC LTER reef sites (2012–2025)."
+#| fig-alt: "Faceted histogram showing lobster carapace size distributions. All sites are right-skewed around 70–100 mm. NAPL and IVEE show the widest spread toward larger sizes."
+#| fig-height: 7
+
+fig1_size_hist
+```
+
+**Figure 2: Temporal Trends in Lobster Abundance**
+
+```{r}
+#| label: fig-abundance
+#| fig-cap: "Total number of California spiny lobster observations per year at each SBC LTER reef site, 2012–2025."
+#| fig-alt: "Line plot of lobster counts by year and site. IVEE and CARP show sharp increases after 2022. AQUE remains consistently low."
+
+fig2_abundance
+```
+
+**Figure 3: Size Class Composition During 2019–2021**
+
+```{r}
+#| label: fig-size-class
+#| fig-cap: "Count of small (≤ 70 mm) and large (> 70 mm) lobsters at each SBC LTER site from 2019 to 2021."
+#| fig-alt: "Dodged bar chart. Large lobsters dominate at all sites. IVEE and CARP have the highest counts overall."
+
+fig3_size_class
+```
+
+### Lobster Trap Buoy Counts (All Years)
+
+```{r}
+# Figure 4- Distribution of trap counts by year
+fig4_traps_hist <- ggplot(data = lobster_traps, aes(x = TRAPS)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  facet_wrap(~ YEAR, ncol = 5) +
+  labs(
+    title = "Distribution of Lobster Trap Counts by Year",
+    x     = "Number of Traps",
+    y     = "Frequency (Observation Counts)"
+  ) +
+  scale_x_continuous(breaks = seq(0, 30, by = 10)) +
+  theme_light() +
+  theme(
+    plot.title       = element_text(size = 14, face = "bold", hjust = 0.5),
+    axis.title       = element_text(size = 10, face = "bold"),
+    axis.text        = element_text(size = 9),
+    strip.text       = element_text(size = 10, face = "bold"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+# Figure 5 — Total traps over time
+fig5_traps_line <- ggplot(data = lobster_traps_summarize,
+                          aes(x = YEAR, y = TOTAL_TRAPS, color = SITE)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = seq(2012, 2021, 2)) +
+  labs(
+    title = "Total Commercial Traps by Year",
+    x = "Year",
+    y = "Total Traps",
+    color = "Site"
+  ) +
+  theme_light() +
+  theme(
+    plot.title       = element_text(size = 13, face = "bold", hjust = 0.5),
+    axis.title       = element_text(size = 11, face = "bold"),
+    axis.text.x      = element_text(size = 9, angle = 45, vjust = 0.5),
+    axis.text.y      = element_text(size = 9),
+    legend.title     = element_text(size = 10),
+    legend.text      = element_text(size = 9),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+# Figure 6 — Fishing pressure bar chart (2019–2021)
+fig6_fishing_pressure <- ggplot(data = lobster_traps_fishing_pressure,
+                                aes(x = SITE, y = COUNT, fill = FISHING_PRESSURE)) +
+  geom_col(position = "dodge", alpha = 0.9) +
+  scale_fill_manual(values = c("high" = "#e07b54", "low" = "#4db3a4"),
+                    labels = c("High (≥ 8 traps)", "Low (< 8 traps)")) +
+  labs(
+    title = "Fishing Pressure by Site (2019–2021)",
+    x = "Site",
+    y = "Count",
+    fill = "Fishing Pressure"
+  ) +
+  theme_light() +
+  theme(
+    plot.title       = element_text(size = 13, face = "bold", hjust = 0.5),
+    axis.title       = element_text(size = 11, face = "bold"),
+    axis.text        = element_text(size = 9),
+    legend.title     = element_text(size = 10),
+    legend.text      = element_text(size = 9),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+```
+
+**Figure 4: Distribution of Trap Counts by Year**
+
+```{r}
+#| label: fig-traps-histogram
+#| fig-cap: "Distribution of lobster commercial trap counts grouped by year across all SBC LTER reef sites."
+#| fig-alt: "Faceted histogram of trap counts per year. Most years show counts concentrated near zero with a right-skewed distribution."
+
+fig4_traps_hist
+```
+
+**Figure 5: Temporal Trends in Trap Counts**
+
+```{r}
+#| label: fig-traps-line
+#| fig-cap: "Total lobster commercial traps observed by year at each SBC LTER reef site, 2012–2021."
+#| fig-alt: "Line plot of total trap counts by year and site. CARP consistently records the highest trap counts. Most sites show a decline after 2016."
+#| fig-height: 5
+#| fig-width: 10
+
+fig5_traps_line
+```
+
+**Figure 6: Fishing Pressure Categories During 2019–2021**
+
+```{r}
+#| label: fig-fishing-pressure
+#| fig-cap: "Count of high (≥ 8 traps) and low (< 8 traps) fishing pressure observations at each SBC LTER site from 2019 to 2021."
+#| fig-alt: "Horizontal dodged bar chart. Low fishing pressure dominates at most sites. CARP shows the most high-pressure observations."
+
+fig6_fishing_pressure
+```
+
+------------------------------------------------------------------------
+
+## Discussion
+
+The trap-count distributions shown in Figure 4 are heavily concentrated near low values across all years, meaning that most individual observations recorded relatively few traps. This pattern explains why low fishing-pressure observations dominate at every site in Figure 6. However, Figure 5 shows that even low trap counts per observation can accumulate into high total trap pressure over time when they occur repeatedly at the same site. CARP is the clearest example — even though most individual observations may be low-pressure, its repeated trap counts across years produce some of the highest total trap counts in the dataset. Therefore, the negative impact of fishing pressure may not come only from frequent high-pressure events, but also from the cumulative effect of repeated low-to-moderate trap effort concentrated at productive lobster sites.
+
+When lobster biological patterns (Figures 1–3) and fishing pressure data (Figures 4–6) are compared together, the relationship between trapping and lobster population health does not follow a simple more traps, leading to fewer lobsters pattern. Instead, the relationship depends strongly on site-specific conditions.
+
+IVEE shows the strongest lobster size-class signal, with the highest number of large lobsters (\> 70 mm) and a wide size distribution spanning approximately 50 mm to over 120 mm in Figure 1. Figure 3 confirms that IVEE has both abundant large and small lobsters, suggesting the site supports both adult survival and ongoing recruitment. Because IVEE is an MPA, this could reflect a positive effect of protection allowing lobsters to survive longer and reach larger sizes. However, this alone does not prove MPA designation caused the pattern, since similar but less pronounced size distributions are observed at CARP, and NAPL — also an MPA — does not show the same strong abundance of large lobsters. Habitat quality and site-specific environmental conditions likely also contribute to IVEE's diverse size structure.
+
+CARP shows high lobster abundance and many large lobsters in Figures 1–3, but also experiences some of the strongest fishing pressure in Figures 5 and 6. In Figure 5, CARP has consistently high total trap counts across years, and in Figure 6 it has the most high fishing-pressure observations. Although Figure 3 shows that large lobsters still dominate at CARP — meaning the population has not yet shifted toward smaller individuals — the consistently high trap pressure suggests ongoing stress that may alter its size structure over time. This represents the clearest negative impact of fishing pressure in this dataset.
+
+AQUE tells a different story. Figure 3 shows relatively low lobster counts at AQUE, yet Figure 6 shows almost no high-pressure observations there. This means low fishing pressure does not automatically correspond to high lobster abundance. AQUE may simply be a lower-abundance site due to habitat, location, or environmental conditions — an important reminder that lobster population patterns are influenced by multiple interacting factors, not fishing pressure alone.
+
+MOHK shows moderate lobster counts and some large lobsters in Figure 3, with relatively lower trap pressure than CARP in Figure 6. Like AQUE, MOHK does not reach the lobster abundance seen at IVEE or CARP, suggesting that site-specific ecological factors independent of fishing pressure also shape local population dynamics.
+
+Notably, IVEE and NAPL are both MPAs, but only IVEE shows very high lobster abundance and large-size dominance. NAPL has fewer lobsters than IVEE and CARP in Figure 3, despite low fishing pressure in Figure 6. This suggests that MPA designation alone does not guarantee high lobster abundance or a dominance of large individuals — habitat differences, lower recruitment, or site-specific conditions may also limit lobster populations even in protected areas.
+
+Overall, the analysis reveals both positive and negative relationships between fishing pressure and lobster population health. IVEE represents the clearest positive pattern, where high abundance and a strong presence of large individuals are consistent with a potentially beneficial effect of MPA protection or favorable habitat. CARP represents the clearest negative impact, where consistently high trap pressure places sustained stress on the population despite current large-size dominance. Taken together, these results indicate that while fishing pressure can have a measurable negative impact on lobster populations, this relationship is not consistent across sites and is shaped by a combination of fishing intensity, habitat conditions, and site-specific ecological processes.
+
+**Commercial Fishing Impacts on Lobster Populations**
+
+The figure below directly compares lobster abundance (left) and commercial trap counts (right) over time at each site. This side-by-side view illustrates the inverse relationship between fishing pressure and lobster population size — as trap counts declined after 2016, lobster counts began to recover, particularly at MPA sites where trapping was already restricted.
+
+```{r}
+#| label: fig-combined
+#| fig-cap: "Left: Total lobsters observed by year. Right: Total commercial traps by year. The inverse trend between trap counts and lobster abundance suggests a negative impact of commercial fishing on lobster populations."
+#| fig-alt: "Two line plots side by side. The left shows lobster counts increasing after 2016, especially at IVEE and CARP. The right shows trap counts declining after 2016, especially at CARP. The contrasting trends support the hypothesis that reduced fishing pressure allows lobster populations to recover."
+#| fig-width: 12
+#| fig-height: 5
+
+fig2_abundance | fig5_traps_line
+```
